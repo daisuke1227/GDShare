@@ -8,8 +8,8 @@
 #include <Geode/modify/LevelListLayer.hpp>
 #include <Geode/ui/Popup.hpp>
 
-#include <GMD.hpp>                // <-- now just the API header
-#include <fmt/format.h>          // for fmt::format
+#include <GMD.hpp>
+#include <fmt/format.h>
 
 #include <filesystem>
 #include <vector>
@@ -34,10 +34,13 @@ template <class L>
 static Task<Result<std::filesystem::path>> promptExportLevel(L* level) {
     auto opts = IMPORT_PICK_OPTIONS;
     if constexpr (std::is_same_v<L, GJLevelList>) {
-        opts.defaultPath = std::string(level->m_listName) + ".gmdl";
-    }
-    else {
-        opts.defaultPath = std::string(level->m_levelName) + ".gmd";
+        opts.defaultPath = std::filesystem::path{
+            std::string(level->m_listName) + ".gmdl"
+        };
+    } else {
+        opts.defaultPath = std::filesystem::path{
+            std::string(level->m_levelName) + ".gmd"
+        };
     }
     return file::pick(file::PickMode::SaveFile, opts);
 }
@@ -50,33 +53,41 @@ static void onExportFilePick(L* level, typename Task<Result<std::filesystem::pat
             std::optional<std::string> err;
             if constexpr (std::is_same_v<L, GJLevelList>) {
                 err = exportListAsGmd(level, path).err();
-            }
-            else {
+            } else {
                 err = exportLevelAsGmd(level, path).err();
             }
 
             if (!err) {
+#if GEODE_IOS
+                // On iOS we only show a single‑button confirmation
                 createQuickPopup(
                     "Exported",
-                    (std::is_same_v<L, GJLevelList>
+                    std::is_same_v<L, GJLevelList>
                         ? "Successfully exported list"
-                        : "Successfully exported level"
-                    ),
-                    "OK", "Open File",
-                    [path](auto, bool btn2) {
-                        if (btn2) file::openFolder(path);
+                        : "Successfully exported level",
+                    "OK"
+                );
+#else
+                // On desktop, offer “Open Folder”
+                createQuickPopup(
+                    "Exported",
+                    std::is_same_v<L, GJLevelList>
+                        ? "Successfully exported list"
+                        : "Successfully exported level",
+                    "OK", "Open Folder",
+                    [path](auto, bool openIt) {
+                        if (openIt) file::openFolder(path);
                     }
                 );
-            }
-            else {
+#endif
+            } else {
                 FLAlertLayer::create(
                     "Error",
                     "Unable to export: " + *err,
                     "OK"
                 )->show();
             }
-        }
-        else {
+        } else {
             FLAlertLayer::create(
                 "Error Exporting",
                 result->unwrapErr(),
@@ -109,7 +120,6 @@ struct $modify(ExportMyLevelLayer, EditLevelLayer) {
             menu->addChild(btn);
             menu->updateLayout();
         }
-
         return true;
     }
 
@@ -144,7 +154,6 @@ struct $modify(ExportOnlineLevelLayer, LevelInfoLayer) {
             menu->addChild(btn);
             menu->updateLayout();
         }
-
         return true;
     }
 
@@ -168,8 +177,7 @@ struct $modify(ImportLayer, LevelBrowserLayer) {
                     auto res = importGmdAsList(path);
                     if (res) {
                         LocalLevelManager::get()->m_localLists->insertObject(*res, 0);
-                    }
-                    else {
+                    } else {
                         FLAlertLayer::create("Error Importing", res.unwrapErr(), "OK")->show();
                         return;
                     }
@@ -179,8 +187,7 @@ struct $modify(ImportLayer, LevelBrowserLayer) {
                     auto res = importGmdAsLevel(path);
                     if (res) {
                         LocalLevelManager::get()->m_localLevels->insertObject(*res, 0);
-                    }
-                    else {
+                    } else {
                         FLAlertLayer::create("Error Importing", res.unwrapErr(), "OK")->show();
                         return;
                     }
@@ -193,7 +200,7 @@ struct $modify(ImportLayer, LevelBrowserLayer) {
                         "OK"
                     )->show();
                     return;
-                } break;
+                }
             }
         }
 
@@ -211,8 +218,7 @@ struct $modify(ImportLayer, LevelBrowserLayer) {
         m_fields->pickListener.bind([](auto* ev) {
             if (auto result = ev->getValue(); result && result->isOk()) {
                 importFiles(result->unwrap());
-            }
-            else if (result) {
+            } else if (result) {
                 FLAlertLayer::create("Error Importing", result->unwrapErr(), "OK")->show();
             }
         });
@@ -225,8 +231,7 @@ struct $modify(ImportLayer, LevelBrowserLayer) {
             return false;
 
         if (search->m_searchType == SearchType::MyLevels
-         || search->m_searchType == SearchType::MyLists)
-        {
+         || search->m_searchType == SearchType::MyLists) {
             auto btnMenu = this->getChildByID("new-level-menu");
             auto importBtn = CCMenuItemSpriteExtra::create(
                 CircleButtonSprite::createWithSpriteFrameName(
@@ -239,21 +244,13 @@ struct $modify(ImportLayer, LevelBrowserLayer) {
             importBtn->setID("import-level-button"_spr);
 
             if (search->m_searchType == SearchType::MyLists
-             && search->m_searchIsOverlay)
-            {
-                btnMenu->addChildAtPosition(
-                    importBtn,
-                    Anchor::BottomLeft,
-                    ccp(0, 60),
-                    false
-                );
-            }
-            else {
+             && search->m_searchIsOverlay) {
+                btnMenu->addChildAtPosition(importBtn, Anchor::BottomLeft, ccp(0, 60), false);
+            } else {
                 btnMenu->addChild(importBtn);
                 btnMenu->updateLayout();
             }
         }
-
         return true;
     }
 };
@@ -281,7 +278,6 @@ struct $modify(ExportListLayer, LevelListLayer) {
             menu->addChild(btn);
             menu->updateLayout();
         }
-
         return true;
     }
 
