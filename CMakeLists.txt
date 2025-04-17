@@ -26,10 +26,14 @@ endif()
 add_subdirectory($ENV{GEODE_SDK} ${CMAKE_BINARY_DIR}/geode)
 
 #==============================================================================
-# Source Files
+# Gather Sources
 #==============================================================================
 file(GLOB_RECURSE MOD_SOURCES
     ${CMAKE_CURRENT_LIST_DIR}/src/*.cpp
+)
+set(GMD_API_DIR ${CMAKE_CURRENT_LIST_DIR}/hjfod.gmd-api)
+file(GLOB_RECURSE GMD_API_SOURCES
+    ${GMD_API_DIR}/src/*.cpp
 )
 
 #==============================================================================
@@ -37,6 +41,7 @@ file(GLOB_RECURSE MOD_SOURCES
 #==============================================================================
 add_library(${PROJECT_NAME} SHARED
     ${MOD_SOURCES}
+    ${GMD_API_SOURCES}
 )
 
 #==============================================================================
@@ -44,7 +49,7 @@ add_library(${PROJECT_NAME} SHARED
 #==============================================================================
 target_include_directories(${PROJECT_NAME}
     PRIVATE
-        ${CMAKE_CURRENT_LIST_DIR}/hjfod.gmd-api/include
+        ${GMD_API_DIR}/include
 )
 
 #==============================================================================
@@ -52,7 +57,6 @@ target_include_directories(${PROJECT_NAME}
 #==============================================================================
 target_link_libraries(${PROJECT_NAME}
     geode-sdk
-    hjfod.gmd-api
 )
 
 #==============================================================================
@@ -61,7 +65,7 @@ target_link_libraries(${PROJECT_NAME}
 setup_geode_mod(${PROJECT_NAME}
     EXTERNALS
         geode.node-ids:1.12.0
-        hjfod.gmd-api:1.4.0
+        hjfod.gmd-api:>=1.4.0
 )
 
 #==============================================================================
