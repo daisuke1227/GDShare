@@ -12,21 +12,42 @@ jobs:
       fail-fast: false
       matrix:
         config:
-
+          - name: Windows
+            os: windows-latest
+          - name: macOS
+            os: macos-latest
           - name: iOS
             os: macos-latest
             target: iOS
+          - name: Android32
+            os: ubuntu-latest
+            target: Android32
+          - name: Android64
+            os: ubuntu-latest
+            target: Android64
 
     name: ${{ matrix.config.name }}
     runs-on: ${{ matrix.config.os }}
 
     steps:
-      - name: Checkout repository (with submodules)
+      # 1) Check out your own repo **with submodules** (so if gmd-api is a git submodule it will be fetched)  
+      - name: Checkout code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          submodules: recursive
+          submodules: recursive   # fetch gmd‑api submodule if you have it set up :contentReference[oaicite:0]{index=0}
 
+      # 2) If you manage gmd‑api as a separate repo rather than a submodule,
+      #    explicitly check it out into the right folder:
+      - name: Checkout GMD‑API
+        if: ${{ always() }}
+        uses: actions/checkout@v4
+        with:
+          repository: hjfod/gmd-api
+          path: hjfod.gmd-api
+          fetch-depth: 1         # you only need the latest
+
+      # 3) Now run the Geode SDK build (it will see hjfod.gmd-api/include/GMD.hpp)
       - name: Build the mod (Release)
         uses: geode-sdk/build-geode-mod@main
         with:
@@ -39,13 +60,11 @@ jobs:
     name: Package builds
     runs-on: ubuntu-latest
     needs: build
-
     steps:
       - uses: geode-sdk/build-geode-mod/combine@main
         id: build
         with:
           cli: nightly
-
       - uses: actions/upload-artifact@v4
         with:
           name: Build Output
