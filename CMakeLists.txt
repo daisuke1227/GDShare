@@ -61,7 +61,7 @@ target_link_libraries(${PROJECT_NAME}
 setup_geode_mod(${PROJECT_NAME}
     EXTERNALS
         geode.node-ids:1.12.0
-        hjfod.gmd-api:1.0.0
+        hjfod.gmd-api:1.4.0
 )
 
 #==============================================================================
