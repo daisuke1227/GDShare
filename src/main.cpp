@@ -1,17 +1,26 @@
 #include <Geode/Loader.hpp>
 #include <Geode/utils/cocos.hpp>
+#include <Geode/utils/file.hpp>
 #include <Geode/modify/LevelBrowserLayer.hpp>
 #include <Geode/modify/LevelInfoLayer.hpp>
 #include <Geode/modify/EditLevelLayer.hpp>
 #include <Geode/modify/IDManager.hpp>
 #include <Geode/modify/LevelListLayer.hpp>
 #include <Geode/ui/Popup.hpp>
-#include <hjfod.gmd-api/include/GMD.hpp>
+
+#include <GMD.hpp>                // <-- now just the API header
+#include <fmt/format.h>          // for fmt::format
+
+#include <filesystem>
+#include <vector>
+#include <optional>
+#include <type_traits>
+#include <string>
 
 using namespace geode::prelude;
 using namespace gmd;
 
-static auto IMPORT_PICK_OPTIONS = file::FilePickOptions {
+static const auto IMPORT_PICK_OPTIONS = file::FilePickOptions{
     std::nullopt,
     {
         {
@@ -32,6 +41,7 @@ static Task<Result<std::filesystem::path>> promptExportLevel(L* level) {
     }
     return file::pick(file::PickMode::SaveFile, opts);
 }
+
 template <class L>
 static void onExportFilePick(L* level, typename Task<Result<std::filesystem::path>>::Event* event) {
     if (auto result = event->getValue()) {
@@ -44,12 +54,13 @@ static void onExportFilePick(L* level, typename Task<Result<std::filesystem::pat
             else {
                 err = exportLevelAsGmd(level, path).err();
             }
+
             if (!err) {
                 createQuickPopup(
                     "Exported",
-                    (std::is_same_v<L, GJLevelList> ?
-                        "Succesfully exported list" :
-                        "Succesfully exported level"
+                    (std::is_same_v<L, GJLevelList>
+                        ? "Successfully exported list"
+                        : "Successfully exported level"
                     ),
                     "OK", "Open File",
                     [path](auto, bool btn2) {
@@ -60,13 +71,17 @@ static void onExportFilePick(L* level, typename Task<Result<std::filesystem::pat
             else {
                 FLAlertLayer::create(
                     "Error",
-                    "Unable to export: " + err.value(),
+                    "Unable to export: " + *err,
                     "OK"
                 )->show();
             }
         }
         else {
-            FLAlertLayer::create("Error Exporting", result->unwrapErr(), "OK")->show();
+            FLAlertLayer::create(
+                "Error Exporting",
+                result->unwrapErr(),
+                "OK"
+            )->show();
         }
     }
 }
@@ -80,9 +95,8 @@ struct $modify(ExportMyLevelLayer, EditLevelLayer) {
     bool init(GJGameLevel* level) {
         if (!EditLevelLayer::init(level))
             return false;
-        
-        auto menu = this->getChildByID("level-actions-menu");
-        if (menu) {
+
+        if (auto menu = this->getChildByID("level-actions-menu")) {
             auto btn = CCMenuItemSpriteExtra::create(
                 CircleButtonSprite::createWithSpriteFrameName(
                     "file.png"_spr, .8f,
@@ -100,7 +114,9 @@ struct $modify(ExportMyLevelLayer, EditLevelLayer) {
     }
 
     void onExport(CCObject*) {
-        m_fields->pickListener.bind([level = m_level](auto* ev) { onExportFilePick(level, ev); });
+        m_fields->pickListener.bind(
+            [level = m_level](auto* ev) { onExportFilePick(level, ev); }
+        );
         m_fields->pickListener.setFilter(promptExportLevel(m_level));
     }
 };
@@ -114,9 +130,8 @@ struct $modify(ExportOnlineLevelLayer, LevelInfoLayer) {
     bool init(GJGameLevel* level, bool challenge) {
         if (!LevelInfoLayer::init(level, challenge))
             return false;
-        
-        auto menu = this->getChildByID("left-side-menu");
-        if (menu) {
+
+        if (auto menu = this->getChildByID("left-side-menu")) {
             auto btn = CCMenuItemSpriteExtra::create(
                 CircleButtonSprite::createWithSpriteFrameName(
                     "file.png"_spr, .8f,
@@ -134,7 +149,9 @@ struct $modify(ExportOnlineLevelLayer, LevelInfoLayer) {
     }
 
     void onExport(CCObject*) {
-        m_fields->pickListener.bind([level = m_level](auto* ev) { onExportFilePick(level, ev); });
+        m_fields->pickListener.bind(
+            [level = m_level](auto* ev) { onExportFilePick(level, ev); }
+        );
         m_fields->pickListener.setFilter(promptExportLevel(m_level));
     }
 };
@@ -148,32 +165,34 @@ struct $modify(ImportLayer, LevelBrowserLayer) {
         for (auto const& path : paths) {
             switch (getGmdFileKind(path)) {
                 case GmdFileKind::List: {
-                    auto res = gmd::importGmdAsList(path);
+                    auto res = importGmdAsList(path);
                     if (res) {
                         LocalLevelManager::get()->m_localLists->insertObject(*res, 0);
                     }
                     else {
-                        return FLAlertLayer::create("Error Importing", res.unwrapErr(), "OK")->show();
+                        FLAlertLayer::create("Error Importing", res.unwrapErr(), "OK")->show();
+                        return;
                     }
                 } break;
 
                 case GmdFileKind::Level: {
-                    auto res = gmd::importGmdAsLevel(path);
+                    auto res = importGmdAsLevel(path);
                     if (res) {
                         LocalLevelManager::get()->m_localLevels->insertObject(*res, 0);
                     }
                     else {
-                        return FLAlertLayer::create("Error Importing", res.unwrapErr(), "OK")->show();
+                        FLAlertLayer::create("Error Importing", res.unwrapErr(), "OK")->show();
+                        return;
                     }
                 } break;
 
                 case GmdFileKind::None: {
-                    // todo: show popup to pick type
-                    return FLAlertLayer::create(
+                    FLAlertLayer::create(
                         "Error Importing",
-                        fmt::format("Selected file '<cp>{}</c>' is not a GMD file!", path),
+                        fmt::format("Selected file '<cp>{}</c>' is not a GMD file!", path.string()),
                         "OK"
                     )->show();
+                    return;
                 } break;
             }
         }
@@ -183,18 +202,18 @@ struct $modify(ImportLayer, LevelBrowserLayer) {
             GJSearchObject::create(SearchType::MyLevels)
         );
         scene->addChild(layer);
-        CCDirector::sharedDirector()->replaceScene(CCTransitionFade::create(.5f, scene));
+        CCDirector::sharedDirector()->replaceScene(
+            CCTransitionFade::create(.5f, scene)
+        );
     }
 
     void onImport(CCObject*) {
-        m_fields->pickListener.bind([](auto* event) {
-            if (auto result = event->getValue()) {
-                if (result->isOk()) {
-                    importFiles(**result);
-                }
-                else {
-                    FLAlertLayer::create("Error Importing", result->unwrapErr(), "OK")->show();
-                }
+        m_fields->pickListener.bind([](auto* ev) {
+            if (auto result = ev->getValue(); result && result->isOk()) {
+                importFiles(result->unwrap());
+            }
+            else if (result) {
+                FLAlertLayer::create("Error Importing", result->unwrapErr(), "OK")->show();
             }
         });
         m_fields->pickListener.setFilter(file::pickMany(IMPORT_PICK_OPTIONS));
@@ -205,23 +224,29 @@ struct $modify(ImportLayer, LevelBrowserLayer) {
         if (!LevelBrowserLayer::init(search))
             return false;
 
-        if (search->m_searchType == SearchType::MyLevels || search->m_searchType == SearchType::MyLists) {
+        if (search->m_searchType == SearchType::MyLevels
+         || search->m_searchType == SearchType::MyLists)
+        {
             auto btnMenu = this->getChildByID("new-level-menu");
-
             auto importBtn = CCMenuItemSpriteExtra::create(
                 CircleButtonSprite::createWithSpriteFrameName(
                     "file.png"_spr, .85f,
                     CircleBaseColor::Pink,
                     CircleBaseSize::Big
                 ),
-                this,
-                menu_selector(ImportLayer::onImport)
+                this, menu_selector(ImportLayer::onImport)
             );
             importBtn->setID("import-level-button"_spr);
 
-            // This one has an ID but no layout which is CRINGE
-            if (search->m_searchType == SearchType::MyLists && search->m_searchIsOverlay) {
-                btnMenu->addChildAtPosition(importBtn, Anchor::BottomLeft, ccp(0, 60), false);
+            if (search->m_searchType == SearchType::MyLists
+             && search->m_searchIsOverlay)
+            {
+                btnMenu->addChildAtPosition(
+                    importBtn,
+                    Anchor::BottomLeft,
+                    ccp(0, 60),
+                    false
+                );
             }
             else {
                 btnMenu->addChild(importBtn);
@@ -242,7 +267,7 @@ struct $modify(ExportListLayer, LevelListLayer) {
     bool init(GJLevelList* level) {
         if (!LevelListLayer::init(level))
             return false;
-        
+
         if (auto menu = this->getChildByID("left-side-menu")) {
             auto btn = CCMenuItemSpriteExtra::create(
                 CircleButtonSprite::createWithSpriteFrameName(
@@ -261,7 +286,9 @@ struct $modify(ExportListLayer, LevelListLayer) {
     }
 
     void onExport(CCObject*) {
-        m_fields->pickListener.bind([list = m_levelList](auto* ev) { onExportFilePick(list, ev); });
+        m_fields->pickListener.bind(
+            [list = m_levelList](auto* ev) { onExportFilePick(list, ev); }
+        );
         m_fields->pickListener.setFilter(promptExportLevel(m_levelList));
     }
 };
