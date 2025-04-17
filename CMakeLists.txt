@@ -26,6 +26,6 @@ set(ALL_SOURCES ${MOD_SOURCES} ${GMD_API_SOURCES})
 add_library(${PROJECT_NAME} SHARED ${ALL_SOURCES})
 
 target_include_directories(${PROJECT_NAME} PRIVATE ${GMD_API_DIR}/include)
-target_link_libraries(${PROJECT_NAME} PRIVATE geode-sdk)
+target_link_libraries(${PROJECT_NAME} geode-sdk)
 
 setup_geode_mod(${PROJECT_NAME} EXTERNALS geode.node-ids:1.12.0)
