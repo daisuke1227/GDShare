@@ -12,7 +12,7 @@ jobs:
       fail-fast: false
       matrix:
         config:
-          
+
           - name: iOS
             os: macos-latest
             target: iOS
@@ -24,8 +24,8 @@ jobs:
       - name: Checkout repository (with submodules)
         uses: actions/checkout@v4
         with:
-          submodules: recursive
           fetch-depth: 0
+          submodules: recursive
 
       - name: Build the mod (Release)
         uses: geode-sdk/build-geode-mod@main
